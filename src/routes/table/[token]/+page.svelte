@@ -402,19 +402,19 @@
 
 				<!-- Portion Size Options -->
 				<div class="space-y-1.5">
-					<label class="block text-xs font-bold text-slate-700">Portion Size</label>
+					<span class="block text-xs font-bold text-slate-700 dark:text-slate-300">Portion Size</span>
 					<div class="grid grid-cols-2 gap-2 text-xs">
 						<button
 							type="button"
 							onclick={() => (selectedVariant = 'Regular')}
-							class="p-2.5 rounded-xl border text-center font-semibold {selectedVariant === 'Regular' ? 'border-rose-600 bg-rose-50 text-rose-700' : 'border-slate-200'}"
+							class="p-2.5 rounded-xl border text-center font-semibold {selectedVariant === 'Regular' ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700'}"
 						>
 							Regular (+₹0)
 						</button>
 						<button
 							type="button"
 							onclick={() => (selectedVariant = 'Full')}
-							class="p-2.5 rounded-xl border text-center font-semibold {selectedVariant === 'Full' ? 'border-rose-600 bg-rose-50 text-rose-700' : 'border-slate-200'}"
+							class="p-2.5 rounded-xl border text-center font-semibold {selectedVariant === 'Full' ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300' : 'border-slate-200 dark:border-slate-700'}"
 						>
 							Large / Full (+₹120)
 						</button>
@@ -423,13 +423,13 @@
 
 				<!-- Spice Level -->
 				<div class="space-y-1.5">
-					<label class="block text-xs font-bold text-slate-700">Spice Preference</label>
+					<span class="block text-xs font-bold text-slate-700 dark:text-slate-300">Spice Preference</span>
 					<div class="grid grid-cols-3 gap-2 text-xs">
 						{#each ['Mild', 'Medium', 'Extra Spicy'] as sp}
 							<button
 								type="button"
 								onclick={() => (selectedSpice = sp)}
-								class="p-2 rounded-xl border text-center font-semibold {selectedSpice === sp ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-slate-200'}"
+								class="p-2 rounded-xl border text-center font-semibold {selectedSpice === sp ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300' : 'border-slate-200 dark:border-slate-700'}"
 							>
 								{sp}
 							</button>
@@ -439,19 +439,20 @@
 
 				<!-- Special Instructions -->
 				<div class="space-y-1">
-					<label class="block text-xs font-bold text-slate-700">Chef Instructions</label>
+					<label for="chef-special-note" class="block text-xs font-bold text-slate-700 dark:text-slate-300">Chef Instructions</label>
 					<input
+						id="chef-special-note"
 						type="text"
 						bind:value={specialNote}
 						placeholder="e.g. Less oil, no onion garnish"
-						class="w-full text-xs px-3 py-2 rounded-xl border border-slate-200"
+						class="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
 					/>
 				</div>
 
 				<button
 					type="button"
 					onclick={handleAddConfiguredItem}
-					class="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition"
+					class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition active:scale-95"
 				>
 					Add to Table Cart
 				</button>

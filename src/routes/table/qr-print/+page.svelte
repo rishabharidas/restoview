@@ -30,10 +30,10 @@
 
 <div class="space-y-6">
 	<!-- Control Bar (Hidden when Printing) -->
-	<div class="print:hidden bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+	<div class="print:hidden bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 		<div>
-			<h2 class="text-xl font-bold text-slate-900">🖨️ Table QR Stand Generator</h2>
-			<p class="text-xs text-slate-500">
+			<h2 class="text-xl font-bold text-slate-900 dark:text-white">🖨️ Table QR Stand Generator</h2>
+			<p class="text-xs text-slate-500 dark:text-slate-400">
 				Print-ready acrylic table stand cards for {$currentTenant.name}. Designed for A5 / A6 acrylic holders.
 			</p>
 		</div>
@@ -42,7 +42,7 @@
 			<button
 				type="button"
 				onclick={triggerPrint}
-				class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow transition flex items-center gap-2"
+				class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 active:scale-95"
 			>
 				🖨️ Print All Cards
 			</button>
