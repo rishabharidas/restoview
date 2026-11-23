@@ -9,8 +9,8 @@ export const defaultTenant: Tenant = {
 	email: 'contact@testrestaurant.com',
 	address: '123 Main Food Street, City Center',
 	branding: {
-		primary_color: '#2563eb',
-		secondary_color: '#1e293b',
+		primary_color: '#27272a',
+		secondary_color: '#18181b',
 		accent_color: '#f59e0b',
 		font_family: 'Inter, sans-serif',
 		logo_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&auto=format&fit=crop&q=80',

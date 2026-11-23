@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { currentTenant, applyTheme } from '$lib/stores/tenant';
+	import AuthGuard from '$lib/components/AuthGuard.svelte';
 
 	// Tab navigation
 	let activeTab = $state<'ANALYTICS' | 'STAFF' | 'MENU' | 'SETTINGS'>('ANALYTICS');
@@ -75,6 +76,7 @@
 	}
 </script>
 
+<AuthGuard requiredRole="ADMIN" roleTitle="Manager & Admin Portal" icon="📊">
 <div class="space-y-6">
 	<!-- Admin Header -->
 	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -430,3 +432,4 @@
 		</div>
 	</div>
 {/if}
+</AuthGuard>

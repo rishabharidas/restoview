@@ -2,6 +2,7 @@
 	import { onDestroy } from 'svelte';
 	import { sendDriverLocation, updateOrderStatus } from '$lib/api';
 	import { currentTenant } from '$lib/stores/tenant';
+	import AuthGuard from '$lib/components/AuthGuard.svelte';
 
 	interface DeliveryTask {
 		orderId: string;
@@ -140,6 +141,7 @@
 	}
 </script>
 
+<AuthGuard requiredRole="DRIVER" roleTitle="Delivery Partner Hub" icon="🛵">
 <div class="max-w-2xl mx-auto space-y-6">
 	<!-- Driver Header & GPS Stream Toggle -->
 	<div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
@@ -305,3 +307,4 @@
 		{/each}
 	</div>
 </div>
+</AuthGuard>

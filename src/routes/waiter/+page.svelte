@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { currentTenant } from '$lib/stores/tenant';
 	import { createWebSocketConnection } from '$lib/api';
+	import AuthGuard from '$lib/components/AuthGuard.svelte';
 
 	interface TableState {
 		number: string;
@@ -169,6 +170,7 @@
 	}
 </script>
 
+<AuthGuard requiredRole="WAITER" roleTitle="Waiter Station" icon="🛎️">
 <div class="space-y-6">
 	<!-- Waiter Header & Floor Overview -->
 	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -416,3 +418,4 @@
 		</div>
 	</div>
 {/if}
+</AuthGuard>

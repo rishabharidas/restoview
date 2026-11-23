@@ -1,3 +1,14 @@
+export type StaffRole = 'GUEST' | 'WAITER' | 'CHEF' | 'DRIVER' | 'ADMIN';
+
+export interface StaffUser {
+	id: string;
+	name: string;
+	role: StaffRole;
+	username: string;
+	title: string;
+	token?: string;
+}
+
 export type OrderType = 'DINE_IN' | 'DELIVERY' | 'TAKEAWAY';
 
 export type OrderStatus =

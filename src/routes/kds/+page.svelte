@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { currentTenant } from '$lib/stores/tenant';
 	import { updateOrderStatus, createWebSocketConnection } from '$lib/api';
+	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import type { Order, OrderStatus } from '$lib/types';
 
 	let selectedStation = $state<'ALL' | 'GRILL' | 'CURRY' | 'BAR' | 'EXPO'>('ALL');
@@ -110,6 +111,7 @@
 	}
 </script>
 
+<AuthGuard requiredRole="CHEF" roleTitle="Kitchen KDS" icon="👨‍🍳">
 <div class="space-y-6">
 	<!-- KDS Header & Station Controls -->
 	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
@@ -310,3 +312,4 @@
 		{/each}
 	</div>
 </div>
+</AuthGuard>
