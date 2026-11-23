@@ -4,8 +4,9 @@ import { render, screen } from '@testing-library/svelte';
 import Page from './+page.svelte';
 
 describe('/+page.svelte', () => {
-	test('should render h1', () => {
+	test('should render restaurant heading and order options', () => {
 		render(Page);
-		expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+		expect(screen.getByText('Delicious Food, Delivered Fast.')).toBeInTheDocument();
+		expect(screen.getByText('🛵 Home Delivery')).toBeInTheDocument();
 	});
 });
