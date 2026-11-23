@@ -15,6 +15,93 @@ export type OrderStatus =
 	| 'COMPLETED'
 	| 'CANCELLED';
 
+export type TableBellAction = 'CALL_WAITER' | 'REQUEST_WATER' | 'REQUEST_BILL';
+
+export interface TableBellAlert {
+	id: string;
+	tenant_id: string;
+	table_id: string;
+	table_number: string;
+	action: TableBellAction;
+	action_label: string;
+	customer_name?: string;
+	notes?: string;
+	created_at: string;
+}
+
+export interface ItemModifierOption {
+	id: string;
+	name: string;
+	price_diff: number;
+}
+
+export interface ItemModifierGroup {
+	id: string;
+	name: string; // e.g. "Size", "Spice Level", "Add-ons"
+	is_required: boolean;
+	min_select: number;
+	max_select: number;
+	options: ItemModifierOption[];
+}
+
+export interface MenuItem {
+	id: string;
+	tenant_id: string;
+	category_id: string;
+	name: string;
+	description?: string;
+	price: number;
+	food_type: 'VEG' | 'NON_VEG' | 'EGG' | 'VEGAN';
+	image_url?: string;
+	is_available: boolean;
+	kitchen_station?: string;
+	preparation_time_mins: number;
+	modifiers?: ItemModifierGroup[];
+}
+
+export interface MultiplayerCartItem {
+	id: string;
+	item_id: string;
+	item_name: string;
+	quantity: number;
+	unit_price: number;
+	selected_variant?: string;
+	selected_addons?: string[];
+	special_instructions?: string;
+	added_by_name: string;
+	added_at: string;
+}
+
+export interface TableSession {
+	table_id: string;
+	table_number: string;
+	tenant_id: string;
+	diners_count: number;
+	items: MultiplayerCartItem[];
+	updated_at: string;
+}
+
+export interface MenuCategory {
+	id: string;
+	tenant_id: string;
+	name: string;
+	description?: string;
+	display_order: number;
+	is_active: boolean;
+	items: MenuItem[];
+}
+
+export interface RestaurantTable {
+	id: string;
+	tenant_id: string;
+	outlet_id: string;
+	table_number: string;
+	qr_code_token: string;
+	capacity: number;
+	status: string;
+	active_order_id?: string;
+}
+
 export interface TenantBranding {
 	primary_color: string;
 	secondary_color: string;
@@ -44,41 +131,6 @@ export interface Tenant {
 	address: string;
 	branding: TenantBranding;
 	settings: TenantSettings;
-}
-
-export interface MenuItem {
-	id: string;
-	tenant_id: string;
-	category_id: string;
-	name: string;
-	description?: string;
-	price: number;
-	food_type: 'VEG' | 'NON_VEG' | 'EGG' | 'VEGAN';
-	image_url?: string;
-	is_available: boolean;
-	kitchen_station?: string;
-	preparation_time_mins: number;
-}
-
-export interface MenuCategory {
-	id: string;
-	tenant_id: string;
-	name: string;
-	description?: string;
-	display_order: number;
-	is_active: boolean;
-	items: MenuItem[];
-}
-
-export interface RestaurantTable {
-	id: string;
-	tenant_id: string;
-	outlet_id: string;
-	table_number: string;
-	qr_code_token: string;
-	capacity: number;
-	status: string;
-	active_order_id?: string;
 }
 
 export interface OrderItemPayload {

@@ -1,6 +1,13 @@
-import type { Tenant, MenuCategory, RestaurantTable, CreateOrderPayload, Order } from './types';
+import type {
+	Tenant,
+	MenuCategory,
+	RestaurantTable,
+	CreateOrderPayload,
+	Order,
+	TableBellAction,
+	TableSession
+} from './types';
 
-// Default to localhost:8080 or public env variable
 const API_BASE_URL = typeof window !== 'undefined' && (window as any).__PUBLIC_API_URL__
 	? (window as any).__PUBLIC_API_URL__
 	: 'http://localhost:8080/api/v1';
@@ -28,6 +35,60 @@ export async function fetchMenu(tenantSlug = 'royal-spice'): Promise<MenuCategor
 export async function resolveTableQR(token: string): Promise<RestaurantTable> {
 	const res = await fetch(`${API_BASE_URL}/table/qr/${token}`);
 	if (!res.ok) throw new Error('Invalid or expired table QR code');
+	return res.json();
+}
+
+// Milestone 2: Digital Server Call Bell
+export async function ringTableBell(
+	tableId: string,
+	action: TableBellAction,
+	tableNumber: string,
+	customerName = '',
+	notes = ''
+): Promise<{ success: boolean; message: string }> {
+	const res = await fetch(`${API_BASE_URL}/table/${tableId}/bell`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			table_id: tableId,
+			table_number: tableNumber,
+			action,
+			customer_name: customerName,
+			notes
+		})
+	});
+	if (!res.ok) throw new Error('Failed to alert server');
+	return res.json();
+}
+
+// Milestone 2: Multiplayer Table Cart
+export async function getTableCart(tableId: string): Promise<TableSession> {
+	const res = await fetch(`${API_BASE_URL}/table/${tableId}/cart`);
+	if (!res.ok) throw new Error('Failed to fetch table cart');
+	return res.json();
+}
+
+export async function syncTableCart(tableId: string, session: Partial<TableSession>): Promise<void> {
+	await fetch(`${API_BASE_URL}/table/${tableId}/cart`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(session)
+	});
+}
+
+// Milestone 2: Table QR Stand Generator
+export async function generateTableQR(tableNumber: string, capacity: number): Promise<{
+	table_id: string;
+	table_number: string;
+	qr_token: string;
+	qr_landing_url: string;
+}> {
+	const res = await fetch(`${API_BASE_URL}/table/generate-qr`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ table_number: tableNumber, capacity })
+	});
+	if (!res.ok) throw new Error('Failed to generate table QR');
 	return res.json();
 }
 
