@@ -3,15 +3,15 @@ import type { Tenant } from '../types';
 
 export const defaultTenant: Tenant = {
 	id: 'a0000000-0000-0000-0000-000000000001',
-	slug: 'royal-spice',
-	name: 'The Royal Spice Restaurant',
+	slug: 'test-resto',
+	name: 'Test Restaurant',
 	phone: '+919876543210',
-	email: 'contact@royalspice.com',
-	address: '123 MG Road, Bangalore, India',
+	email: 'contact@testrestaurant.com',
+	address: '123 Main Food Street, City Center',
 	branding: {
-		primary_color: '#e11d48',
+		primary_color: '#2563eb',
 		secondary_color: '#1e293b',
-		accent_color: '#fbbf24',
+		accent_color: '#f59e0b',
 		font_family: 'Inter, sans-serif',
 		logo_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&auto=format&fit=crop&q=80',
 		hero_banner_url: ''

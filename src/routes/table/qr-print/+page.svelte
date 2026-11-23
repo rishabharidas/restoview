@@ -7,16 +7,16 @@
 		capacity: number;
 	}
 
-	let wifiName = $state('RoyalSpice_Guest');
+	let wifiName = $state('TestResto_Guest');
 	let wifiPass = $state('EatDelicious2026');
 
 	let tables: PrintableTable[] = $state([
-		{ number: 'T-01', qrToken: 'qr_token_table_1_royal_spice', capacity: 4 },
-		{ number: 'T-02', qrToken: 'qr_token_table_2_royal_spice', capacity: 2 },
-		{ number: 'T-03', qrToken: 'qr_token_table_3_royal_spice', capacity: 6 },
-		{ number: 'T-04', qrToken: 'qr_token_table_4_royal_spice', capacity: 4 },
-		{ number: 'T-05', qrToken: 'qr_token_table_5_royal_spice', capacity: 4 },
-		{ number: 'T-06', qrToken: 'qr_token_table_6_royal_spice', capacity: 8 }
+		{ number: 'T-01', qrToken: 'qr_token_table_1_test_resto', capacity: 4 },
+		{ number: 'T-02', qrToken: 'qr_token_table_2_test_resto', capacity: 2 },
+		{ number: 'T-03', qrToken: 'qr_token_table_3_test_resto', capacity: 6 },
+		{ number: 'T-04', qrToken: 'qr_token_table_4_test_resto', capacity: 4 },
+		{ number: 'T-05', qrToken: 'qr_token_table_5_test_resto', capacity: 4 },
+		{ number: 'T-06', qrToken: 'qr_token_table_6_test_resto', capacity: 8 }
 	]);
 
 	function triggerPrint() {

@@ -16,7 +16,7 @@ const WS_BASE_URL = typeof window !== 'undefined' && (window as any).__PUBLIC_WS
 	? (window as any).__PUBLIC_WS_URL__
 	: 'ws://localhost:8080/ws';
 
-export async function fetchTenantConfig(tenantSlug = 'royal-spice'): Promise<Tenant> {
+export async function fetchTenantConfig(tenantSlug = 'test-resto'): Promise<Tenant> {
 	const res = await fetch(`${API_BASE_URL}/tenant/config`, {
 		headers: { 'X-Tenant-Slug': tenantSlug }
 	});
@@ -24,7 +24,7 @@ export async function fetchTenantConfig(tenantSlug = 'royal-spice'): Promise<Ten
 	return res.json();
 }
 
-export async function fetchMenu(tenantSlug = 'royal-spice'): Promise<MenuCategory[]> {
+export async function fetchMenu(tenantSlug = 'test-resto'): Promise<MenuCategory[]> {
 	const res = await fetch(`${API_BASE_URL}/menu`, {
 		headers: { 'X-Tenant-Slug': tenantSlug }
 	});
@@ -92,7 +92,7 @@ export async function generateTableQR(tableNumber: string, capacity: number): Pr
 	return res.json();
 }
 
-export async function createOrder(payload: CreateOrderPayload, tenantSlug = 'royal-spice'): Promise<{
+export async function createOrder(payload: CreateOrderPayload, tenantSlug = 'test-resto'): Promise<{
 	order_id: string;
 	order_number: string;
 	total_amount: number;
