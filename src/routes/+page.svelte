@@ -200,8 +200,8 @@
 	}
 </script>
 
-<div class="space-y-10">
-	<!-- 🌟 Dynamic Landing / Hero Section with Resto Action Widget -->
+<div class="space-y-12">
+	<!-- 🌟 Clean Michelin-Style Hero Section with Resto Action Widget -->
 	<DynamicLandingRenderer
 		customHtml={$currentTenant.branding.custom_landing_html}
 		tableToken="qr_token_table_1_test_resto"
@@ -211,49 +211,14 @@
 		detectedAddress={deliveryAddress}
 	/>
 
-	<!-- 🏅 Restaurant Pillars / Achievements Showcase (Dark Grey Cards) -->
-	<section class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-		<div class="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center gap-3 transition hover:border-zinc-400 dark:hover:border-zinc-700">
-			<span class="text-2xl p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">🔥</span>
-			<div>
-				<h4 class="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white">Clay Tandoor</h4>
-				<p class="text-[11px] text-zinc-500 dark:text-zinc-400">Authentic charcoal roast</p>
-			</div>
-		</div>
-
-		<div class="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center gap-3 transition hover:border-zinc-400 dark:hover:border-zinc-700">
-			<span class="text-2xl p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">🌱</span>
-			<div>
-				<h4 class="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white">Farm Fresh</h4>
-				<p class="text-[11px] text-zinc-500 dark:text-zinc-400">Zero artificial colors</p>
-			</div>
-		</div>
-
-		<div class="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center gap-3 transition hover:border-zinc-400 dark:hover:border-zinc-700">
-			<span class="text-2xl p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">⚡</span>
-			<div>
-				<h4 class="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white">30 Min Delivery</h4>
-				<p class="text-[11px] text-zinc-500 dark:text-zinc-400">Insulated thermal boxes</p>
-			</div>
-		</div>
-
-		<div class="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-xs flex items-center gap-3 transition hover:border-zinc-400 dark:hover:border-zinc-700">
-			<span class="text-2xl p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">🧼</span>
-			<div>
-				<h4 class="font-bold text-xs sm:text-sm text-zinc-900 dark:text-white">5-Star Hygiene</h4>
-				<p class="text-[11px] text-zinc-500 dark:text-zinc-400">Certified kitchen safety</p>
-			</div>
-		</div>
-	</section>
-
-	<!-- 🍽️ Menu & Live Ordering Grid -->
-	<div id="menu-section" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+	<!-- 🍽️ Curated Culinary Menu & Live Ordering Grid -->
+	<div id="menu-section" class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start pt-4">
 		<!-- Menu List (Left 2 Columns) -->
-		<div class="lg:col-span-2 space-y-6">
-			<!-- Order Mode Toggle (Delivery vs Takeaway) -->
+		<div class="lg:col-span-2 space-y-5">
+			<!-- Minimalist Filter Bar -->
 			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xs">
 				<div class="flex items-center gap-2">
-					<span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Order Mode:</span>
+					<span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Mode:</span>
 					<div class="inline-flex rounded-xl bg-zinc-100 dark:bg-zinc-800 p-1">
 						<button
 							type="button"
@@ -262,7 +227,7 @@
 								? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs'
 								: 'text-zinc-600 dark:text-zinc-300 hover:text-zinc-900'}"
 						>
-							🛵 Home Delivery
+							Delivery
 						</button>
 						<button
 							type="button"
@@ -271,7 +236,7 @@
 								? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-xs'
 								: 'text-zinc-600 dark:text-zinc-300 hover:text-zinc-900'}"
 						>
-							🛍️ Takeaway / Pickup
+							Takeaway
 						</button>
 					</div>
 				</div>
@@ -358,7 +323,7 @@
 											</h4>
 
 											{#if item.description}
-												<p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+												<p class="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed font-light">
 													{item.description}
 												</p>
 											{/if}
@@ -416,7 +381,7 @@
 				<div class="py-10 text-center text-zinc-400 text-sm space-y-2">
 					<span class="text-3xl block">🍲</span>
 					<p>Your cart is empty.</p>
-					<p class="text-xs text-zinc-500">Pick signature dishes from the menu to get started!</p>
+					<p class="text-xs text-zinc-500 font-light">Select signature dishes from the menu to begin.</p>
 				</div>
 			{:else}
 				<div class="space-y-3 max-h-64 overflow-y-auto pr-1 divide-y divide-zinc-100 dark:divide-zinc-800">
