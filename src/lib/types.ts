@@ -55,6 +55,12 @@ export interface ItemModifierGroup {
 	options: ItemModifierOption[];
 }
 
+export interface ItemVariant {
+	id: string;
+	name: string;
+	price_adjustment: number;
+}
+
 export interface MenuItem {
 	id: string;
 	tenant_id: string;
@@ -66,7 +72,10 @@ export interface MenuItem {
 	image_url?: string;
 	is_available: boolean;
 	kitchen_station?: string;
+	assigned_stations?: string[];
+	allergens?: string[];
 	preparation_time_mins: number;
+	variants?: ItemVariant[];
 	modifiers?: ItemModifierGroup[];
 }
 
@@ -76,7 +85,8 @@ export interface MultiplayerCartItem {
 	item_name: string;
 	quantity: number;
 	unit_price: number;
-	selected_variant?: string;
+	selected_variant?: string | ItemVariant;
+	selected_modifiers?: (string | ItemModifierOption)[];
 	selected_addons?: string[];
 	special_instructions?: string;
 	added_by_name: string;
@@ -111,6 +121,22 @@ export interface RestaurantTable {
 	capacity: number;
 	status: string;
 	active_order_id?: string;
+}
+
+export interface TableOverview {
+	id: string;
+	tenant_id: string;
+	outlet_id: string;
+	table_number: string;
+	qr_code_token: string;
+	capacity: number;
+	status: 'AVAILABLE' | 'OCCUPIED' | 'RESERVED';
+	active_order_id?: string;
+	active_order_number?: string;
+	active_order_status?: OrderStatus;
+	active_order_total?: number;
+	customer_name?: string;
+	elapsed_minutes?: number;
 }
 
 export interface TenantBranding {
@@ -149,12 +175,17 @@ export interface Tenant {
 export interface OrderItemPayload {
 	item_id: string;
 	quantity: number;
+	variant_id?: string;
+	selected_modifiers?: ItemModifierOption[];
 	special_instructions?: string;
+	assigned_station?: string;
 }
 
 export interface CreateOrderPayload {
+	idempotency_key?: string;
 	order_type: OrderType;
 	table_id?: string;
+	outlet_id?: string;
 	customer_name: string;
 	customer_phone: string;
 	delivery_address?: string;
@@ -164,6 +195,23 @@ export interface CreateOrderPayload {
 	items: OrderItemPayload[];
 }
 
+export interface OrderItem {
+	id: string;
+	order_id?: string;
+	item_id: string;
+	item_name?: string;
+	name?: string;
+	quantity: number;
+	unit_price: number;
+	item_total: number;
+	item_status: OrderStatus;
+	assigned_station?: string;
+	special_instructions?: string;
+	kitchen_notes?: string;
+	completed_at?: string;
+	selected_modifiers?: ItemModifierOption[];
+}
+
 export interface Order {
 	id: string;
 	tenant_id: string;
@@ -171,21 +219,18 @@ export interface Order {
 	order_number: string;
 	order_type: OrderType;
 	status: OrderStatus;
+	table_id?: string;
+	table_number?: string;
+	customer_name?: string;
+	customer_phone?: string;
 	subtotal: number;
 	tax_amount: number;
 	delivery_fee: number;
 	total_amount: number;
 	payment_status: string;
 	created_at: string;
-	items?: Array<{
-		id: string;
-		item_id: string;
-		name?: string;
-		quantity: number;
-		unit_price: number;
-		item_total: number;
-		item_status: OrderStatus;
-	}>;
+	updated_at?: string;
+	items?: OrderItem[];
 }
 
 export interface DriverLocation {
@@ -196,4 +241,27 @@ export interface DriverLocation {
 	heading: number;
 	speed: number;
 	timestamp: string;
+}
+
+export interface CMSSection {
+	id: string;
+	page_id: string;
+	tenant_id: string;
+	section_type: string;
+	display_order: number;
+	is_enabled: boolean;
+	content: Record<string, any>;
+	settings: Record<string, any>;
+	created_at?: string;
+	updated_at?: string;
+}
+
+export interface CMSPage {
+	id: string;
+	tenant_id: string;
+	slug: string;
+	title: string;
+	is_published: boolean;
+	meta_description?: string;
+	sections: CMSSection[];
 }

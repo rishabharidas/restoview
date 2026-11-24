@@ -1,11 +1,59 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { currentTenant, applyTheme } from '$lib/stores/tenant';
+	import {
+		fetchMenu,
+		createMenuCategory,
+		deleteMenuCategory,
+		createMenuItem,
+		deleteMenuItem,
+		toggleItemAvailability,
+		importMenuCSV,
+		fetchCMSPage,
+		addCMSSection,
+		updateCMSSection,
+		deleteCMSSection,
+		reorderCMSSections,
+		updateCMSLandingMode
+	} from '$lib/api';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
+	import type { MenuCategory, MenuItem, CMSSection } from '$lib/types';
 
 	// Tab navigation
-	let activeTab = $state<'ANALYTICS' | 'STAFF' | 'CMS' | 'SETTINGS'>('ANALYTICS');
+	let activeTab = $state<'ANALYTICS' | 'MENU' | 'CMS' | 'STAFF' | 'SETTINGS'>('ANALYTICS');
 
-	// Storefront CMS states
+	// Menu Management States
+	let categories = $state<MenuCategory[]>([]);
+	let menuLoading = $state(false);
+	let newCategoryName = $state('');
+	let newCategoryModal = $state(false);
+
+	let newItemModal = $state(false);
+	let newItemCategoryId = $state('');
+	let newItemName = $state('');
+	let newItemDescription = $state('');
+	let newItemPrice = $state(250);
+	let newItemFoodType = $state<'VEG' | 'NON_VEG' | 'EGG' | 'VEGAN'>('VEG');
+	let newItemPrepTime = $state(15);
+	let newItemStation = $state('MAIN_KITCHEN');
+	let newItemAllergens = $state<string[]>([]);
+	let isSubmittingMenu = $state(false);
+
+	// CSV Import State
+	let csvImportModal = $state(false);
+	let csvText = $state('');
+	let csvImportResult = $state('');
+
+	// Storefront CMS Dynamic Sections states
+	let cmsSections = $state<CMSSection[]>([]);
+	let cmsSectionsLoading = $state(false);
+	let addSectionModal = $state(false);
+	let newSectionType = $state('story');
+	let newSectionTitle = $state('');
+	let newSectionSubtitle = $state('');
+	let newSectionImage = $state('');
+
+	// Custom HTML landing states
 	let cmsLandingMode = $state<'DEFAULT' | 'CUSTOM_HTML'>($currentTenant.branding.landing_mode ?? 'DEFAULT');
 	let cmsCustomHtml = $state($currentTenant.branding.custom_landing_html ?? '');
 	let cmsSaveSuccess = $state(false);
@@ -41,26 +89,7 @@
     </span>
     <h1 class="text-4xl sm:text-6xl font-black tracking-tight">Artisan Woodfired Trattoria</h1>
     <p class="text-zinc-300 text-sm sm:text-base leading-relaxed">
-      Hand-stretched 48-hour fermented sourdough pizzas, hand-rolled bronze-cut pastas, and Tuscan reserve pairings. Reserve your candlelit table or order takeaway.
-    </p>
-
-    <!-- 📌 Embedded Resto Platform Action Widget -->
-    <div class="pt-4" data-resto-widget="actions"></div>
-  </div>
-</div>`
-		},
-		{
-			id: 'cloud_kitchen',
-			name: '⚡ Express Cloud Kitchen Hub',
-			desc: 'High-speed delivery and takeaway focused design',
-			html: `<div class="relative overflow-hidden rounded-3xl bg-zinc-900 text-white p-8 sm:p-10 border border-zinc-700 shadow-xl">
-  <div class="max-w-3xl space-y-3">
-    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-      ⚡ 30-Minute Doorstep Express Guarantee
-    </span>
-    <h1 class="text-3xl sm:text-5xl font-black tracking-tight">Gourmet Feasts Delivered to You</h1>
-    <p class="text-zinc-400 text-xs sm:text-sm">
-      Hot, fresh culinary bowls and platters sealed in hospital-grade thermal boxes with live driver GPS tracking.
+      Hand-stretched 48-hour fermented sourdough pizzas, hand-rolled bronze-cut pastas, and Tuscan reserve pairings.
     </p>
 
     <!-- 📌 Embedded Resto Platform Action Widget -->
@@ -70,16 +99,214 @@
 		}
 	];
 
-	function applyCmsTemplate(templateHtml: string) {
-		cmsCustomHtml = templateHtml;
-		cmsLandingMode = 'CUSTOM_HTML';
+	async function loadMenu() {
+		menuLoading = true;
+		try {
+			categories = await fetchMenu();
+			if (categories.length > 0 && !newItemCategoryId) {
+				newItemCategoryId = categories[0].id;
+			}
+		} catch (e) {
+			console.log('Failed to fetch menu in admin', e);
+		} finally {
+			menuLoading = false;
+		}
 	}
 
-	function insertWidgetSnippet(snippet: string) {
-		cmsCustomHtml += '\n' + snippet;
+	async function loadCMSSections() {
+		cmsSectionsLoading = true;
+		try {
+			const res = await fetchCMSPage('home', true);
+			if (res && res.page && res.page.sections) {
+				cmsSections = res.page.sections;
+			}
+		} catch (e) {
+			console.log('Failed to fetch CMS sections', e);
+		} finally {
+			cmsSectionsLoading = false;
+		}
 	}
 
-	function saveStorefrontCms() {
+	onMount(() => {
+		loadMenu();
+		loadCMSSections();
+	});
+
+	// Category Management
+	async function handleAddCategory() {
+		if (!newCategoryName.trim()) return;
+		try {
+			await createMenuCategory({ name: newCategoryName.trim(), display_order: categories.length + 1 });
+			newCategoryName = '';
+			newCategoryModal = false;
+			await loadMenu();
+		} catch (e: any) {
+			alert('Failed to create category: ' + e.message);
+		}
+	}
+
+	async function handleDeleteCategory(catId: string) {
+		if (!confirm('Are you sure you want to delete this category?')) return;
+		try {
+			await deleteMenuCategory(catId);
+			await loadMenu();
+		} catch (e: any) {
+			alert('Failed to delete category: ' + e.message);
+		}
+	}
+
+	// Food Item Management
+	async function handleAddMenuItem() {
+		if (!newItemName || !newItemCategoryId) {
+			alert('Dish name and category are required');
+			return;
+		}
+		isSubmittingMenu = true;
+		try {
+			await createMenuItem({
+				category_id: newItemCategoryId,
+				name: newItemName,
+				description: newItemDescription,
+				price: Number(newItemPrice),
+				food_type: newItemFoodType,
+				preparation_time_mins: Number(newItemPrepTime),
+				kitchen_station: newItemStation,
+				assigned_stations: [newItemStation],
+				allergens: newItemAllergens,
+				is_available: true
+			});
+			newItemModal = false;
+			newItemName = '';
+			newItemDescription = '';
+			await loadMenu();
+		} catch (e: any) {
+			alert('Failed to create item: ' + e.message);
+		} finally {
+			isSubmittingMenu = false;
+		}
+	}
+
+	async function handleDeleteItem(itemId: string) {
+		if (!confirm('Are you sure you want to delete this menu item?')) return;
+		try {
+			await deleteMenuItem(itemId);
+			await loadMenu();
+		} catch (e: any) {
+			alert('Failed to delete item: ' + e.message);
+		}
+	}
+
+	async function handleToggleAvailability(item: MenuItem) {
+		try {
+			await toggleItemAvailability(item.id, !item.is_available);
+			await loadMenu();
+		} catch (e: any) {
+			alert('Failed to toggle availability: ' + e.message);
+		}
+	}
+
+	// Bulk CSV Import
+	async function handleBulkCSVImport() {
+		if (!csvText.trim()) return;
+		isSubmittingMenu = true;
+		try {
+			const res = await importMenuCSV(csvText.trim());
+			csvImportResult = res.message;
+			csvText = '';
+			await loadMenu();
+			setTimeout(() => {
+				csvImportModal = false;
+				csvImportResult = '';
+			}, 2000);
+		} catch (e: any) {
+			alert('CSV import failed: ' + e.message);
+		} finally {
+			isSubmittingMenu = false;
+		}
+	}
+
+	// Dynamic CMS Sections
+	async function handleAddSection() {
+		let content: any = {};
+		if (newSectionType === 'story') {
+			content = {
+				heading: newSectionTitle || 'Our Culinary Heritage',
+				subheading: newSectionSubtitle || 'ARTISANAL WOODFIRED HERITAGE',
+				story_paragraphs: ['Every dish is an homage to timeless recipes stone-ground daily.'],
+				chef_name: 'Executive Chef',
+				image_url: newSectionImage || 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=800'
+			};
+		} else if (newSectionType === 'ambience_gallery') {
+			content = {
+				title: newSectionTitle || 'Artisanal Ambience & Dining Spaces',
+				images: [
+					{ url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800', caption: 'The Hearth Lounge' },
+					{ url: 'https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?w=800', caption: 'Courtyard Terrace' }
+				]
+			};
+		}
+
+		try {
+			await addCMSSection('home', {
+				section_type: newSectionType,
+				display_order: cmsSections.length + 1,
+				is_enabled: true,
+				content,
+				settings: {}
+			});
+			addSectionModal = false;
+			newSectionTitle = '';
+			newSectionSubtitle = '';
+			await loadCMSSections();
+		} catch (e: any) {
+			alert('Failed to add section: ' + e.message);
+		}
+	}
+
+	async function moveSection(idx: number, direction: 'UP' | 'DOWN') {
+		const targetIdx = direction === 'UP' ? idx - 1 : idx + 1;
+		if (targetIdx < 0 || targetIdx >= cmsSections.length) return;
+
+		const reordered = [...cmsSections];
+		const temp = reordered[idx];
+		reordered[idx] = reordered[targetIdx];
+		reordered[targetIdx] = temp;
+
+		cmsSections = reordered;
+		try {
+			await reorderCMSSections(reordered.map((s) => s.id));
+			await loadCMSSections();
+		} catch (e: any) {
+			alert('Failed to reorder: ' + e.message);
+		}
+	}
+
+	async function toggleSectionStatus(section: CMSSection) {
+		try {
+			await updateCMSSection(section.id, {
+				section_type: section.section_type,
+				display_order: section.display_order,
+				is_enabled: !section.is_enabled,
+				content: section.content,
+				settings: section.settings
+			});
+			await loadCMSSections();
+		} catch (e: any) {
+			alert('Failed to update section: ' + e.message);
+		}
+	}
+
+	async function handleDeleteSection(sectionId: string) {
+		if (!confirm('Delete this section from the storefront?')) return;
+		try {
+			await deleteCMSSection(sectionId);
+			await loadCMSSections();
+		} catch (e: any) {
+			alert('Failed to delete section: ' + e.message);
+		}
+	}
+
+	async function saveStorefrontCms() {
 		currentTenant.update((t) => ({
 			...t,
 			branding: {
@@ -88,23 +315,14 @@
 				custom_landing_html: cmsCustomHtml
 			}
 		}));
-		cmsSaveSuccess = true;
-		setTimeout(() => {
-			cmsSaveSuccess = false;
-		}, 3000);
-	}
-
-	function resetToDefaultStorefront() {
-		cmsLandingMode = 'DEFAULT';
-		cmsCustomHtml = '';
-		currentTenant.update((t) => ({
-			...t,
-			branding: {
-				...t.branding,
-				landing_mode: 'DEFAULT',
-				custom_landing_html: ''
-			}
-		}));
+		try {
+			await updateCMSLandingMode({
+				landing_mode: cmsLandingMode,
+				custom_landing_html: cmsCustomHtml
+			});
+		} catch (e) {
+			console.log('Saved to local tenant store');
+		}
 		cmsSaveSuccess = true;
 		setTimeout(() => {
 			cmsSaveSuccess = false;
@@ -121,14 +339,7 @@
 		gstTaxCollected: 2030.95
 	});
 
-	let topSoldDishes = $state([
-		{ name: 'Butter Chicken Masala', category: 'Main Course', portionsSold: 42, revenue: 17640, type: 'NON_VEG' },
-		{ name: 'Paneer Tikka', category: 'Starters', portionsSold: 38, revenue: 10640, type: 'VEG' },
-		{ name: 'Dal Makhani', category: 'Main Course', portionsSold: 34, revenue: 8840, type: 'VEG' },
-		{ name: 'Garlic Naan', category: 'Breads', portionsSold: 76, revenue: 5320, type: 'VEG' },
-		{ name: 'Mango Lassi', category: 'Beverages', portionsSold: 28, revenue: 3360, type: 'VEG' }
-	]);
-
+	// Mock staff data
 	interface StaffMember {
 		id: string;
 		name: string;
@@ -141,106 +352,77 @@
 	let staffList: StaffMember[] = $state([
 		{ id: '1', name: 'Rajesh Kumar', role: 'Chef', phone: '+91 98765 11001', status: 'ON_DUTY', shift: 'Morning / Tandoor' },
 		{ id: '2', name: 'Sunil Sharma', role: 'Chef', phone: '+91 98765 11002', status: 'ON_DUTY', shift: 'Curry & Wok' },
-		{ id: '3', name: 'Pooja Verma', role: 'Waiter', phone: '+91 98765 22001', status: 'ON_DUTY', shift: 'Tables 1-4' },
-		{ id: '4', name: 'Vikram Singh', role: 'Waiter', phone: '+91 98765 22002', status: 'ON_DUTY', shift: 'Tables 5-8' },
-		{ id: '5', name: 'Amit Patel', role: 'Driver', phone: '+91 98765 33001', status: 'ON_DUTY', shift: 'Bike Fleet #1' },
-		{ id: '6', name: 'Deepak Joshi', role: 'Driver', phone: '+91 98765 33002', status: 'OFF_DUTY', shift: 'Bike Fleet #2' },
-		{ id: '7', name: 'Anil Mehta', role: 'Manager', phone: '+91 98765 44001', status: 'ON_DUTY', shift: 'General Floor' }
+		{ id: '3', name: 'Pooja Verma', role: 'Waiter', phone: '+91 98765 22001', status: 'ON_DUTY', shift: 'Floor Captain' },
+		{ id: '4', name: 'Amit Patel', role: 'Driver', phone: '+91 98765 33001', status: 'ON_DUTY', shift: 'Bike Fleet #1' },
+		{ id: '5', name: 'Anil Mehta', role: 'Manager', phone: '+91 98765 44001', status: 'ON_DUTY', shift: 'General Floor' }
 	]);
-
-	let newStaffModal = $state(false);
-	let newStaffName = $state('');
-	let newStaffRole = $state<'Chef' | 'Waiter' | 'Driver' | 'Manager'>('Waiter');
-	let newStaffPhone = $state('');
-
-	function addStaffMember() {
-		if (!newStaffName || !newStaffPhone) {
-			alert('Please enter staff name and phone');
-			return;
-		}
-
-		staffList = [
-			...staffList,
-			{
-				id: 'staff-' + Date.now(),
-				name: newStaffName,
-				role: newStaffRole,
-				phone: newStaffPhone,
-				status: 'ON_DUTY',
-				shift: 'General Shift'
-			}
-		];
-		newStaffName = '';
-		newStaffPhone = '';
-		newStaffModal = false;
-	}
-
-	function toggleStaffDuty(id: string) {
-		staffList = staffList.map((s) =>
-			s.id === id ? { ...s, status: s.status === 'ON_DUTY' ? 'OFF_DUTY' : 'ON_DUTY' } : s
-		);
-	}
 </script>
 
 <AuthGuard requiredRole="ADMIN" roleTitle="Manager & Admin Portal" icon="📊">
 <div class="space-y-6">
 	<!-- Admin Header -->
-	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-slate-800">
+	<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
 		<div>
 			<div class="flex items-center gap-2">
-				<h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-					📊 Manager & Admin Command Center
+				<h2 class="text-2xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+					📊 Manager Command Center
 				</h2>
 				<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
 					Admin Access
 				</span>
 			</div>
-			<p class="text-xs text-slate-500 dark:text-slate-400">
-				Monitor business income, manage kitchen & floor staff, review top-performing dishes, and configure restaurant branding.
+			<p class="text-xs text-zinc-500 dark:text-zinc-400">
+				Manage menus, dynamic website sections, kitchen stations, team shifts, and branding.
 			</p>
 		</div>
 
 		<!-- Tab Navigation Buttons -->
-		<div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700 text-xs font-bold">
+		<div class="inline-flex rounded-xl bg-zinc-100 dark:bg-zinc-800 p-1 border border-zinc-200 dark:border-zinc-700 text-xs font-bold flex-wrap gap-1">
 			<button
 				type="button"
 				onclick={() => (activeTab = 'ANALYTICS')}
-				class="px-3 py-1.5 rounded-lg transition {activeTab === 'ANALYTICS' ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}"
+				class="px-3 py-1.5 rounded-lg transition {activeTab === 'ANALYTICS' ? 'bg-white dark:bg-zinc-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'}"
 			>
-				📈 Sales & Income
+				📈 Sales
 			</button>
 			<button
 				type="button"
-				onclick={() => (activeTab = 'STAFF')}
-				class="px-3 py-1.5 rounded-lg transition {activeTab === 'STAFF' ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}"
+				onclick={() => (activeTab = 'MENU')}
+				class="px-3 py-1.5 rounded-lg transition {activeTab === 'MENU' ? 'bg-white dark:bg-zinc-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'}"
 			>
-				👥 Staff Management ({staffList.length})
+				🍽️ Menu & Dishes
 			</button>
 			<button
 				type="button"
 				onclick={() => (activeTab = 'CMS')}
-				class="px-3 py-1.5 rounded-lg transition {activeTab === 'CMS' ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}"
+				class="px-3 py-1.5 rounded-lg transition {activeTab === 'CMS' ? 'bg-white dark:bg-zinc-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'}"
 			>
-				🌐 Storefront CMS & Widgets
+				🌐 Storefront CMS
+			</button>
+			<button
+				type="button"
+				onclick={() => (activeTab = 'STAFF')}
+				class="px-3 py-1.5 rounded-lg transition {activeTab === 'STAFF' ? 'bg-white dark:bg-zinc-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'}"
+			>
+				👥 Staff ({staffList.length})
 			</button>
 			<button
 				type="button"
 				onclick={() => (activeTab = 'SETTINGS')}
-				class="px-3 py-1.5 rounded-lg transition {activeTab === 'SETTINGS' ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}"
+				class="px-3 py-1.5 rounded-lg transition {activeTab === 'SETTINGS' ? 'bg-white dark:bg-zinc-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400'}"
 			>
-				⚙️ Restaurant Settings
+				⚙️ Settings
 			</button>
 		</div>
 	</div>
 
-	<!-- TAB 1: SALES & INCOME ANALYTICS -->
+	<!-- TAB 1: SALES ANALYTICS -->
 	{#if activeTab === 'ANALYTICS'}
 		<div class="space-y-6">
-			<!-- KPI Stat Cards -->
 			<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-				<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-2">
-					<span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Gross Income Today</span>
-					<h3 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+				<div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-xs space-y-2">
+					<span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Gross Income Today</span>
+					<h3 class="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">
 						₹{todayStats.grossRevenue.toLocaleString('en-IN')}
 					</h3>
 					<span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
@@ -248,107 +430,302 @@
 					</span>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-2">
-					<span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Orders</span>
-					<h3 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+				<div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-xs space-y-2">
+					<span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Total Orders</span>
+					<h3 class="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">
 						{todayStats.totalOrders}
 					</h3>
-					<p class="text-[11px] text-slate-500 dark:text-slate-400">
+					<p class="text-[11px] text-zinc-500 dark:text-zinc-400">
 						🍽️ {todayStats.dineInOrders} Dine-In • 🛵 {todayStats.deliveryOrders} Delivery
 					</p>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-2">
-					<span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Average Ticket Size</span>
-					<h3 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+				<div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-xs space-y-2">
+					<span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Average Ticket</span>
+					<h3 class="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">
 						₹{todayStats.averageTicket.toFixed(2)}
 					</h3>
-					<span class="text-[11px] text-slate-400">Per table / delivery run</span>
+					<span class="text-[11px] text-zinc-400">Per table / run</span>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-2">
-					<span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">GST Tax Collected</span>
-					<h3 class="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
+				<div class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-xs space-y-2">
+					<span class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">GST Statutory</span>
+					<h3 class="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-white">
 						₹{todayStats.gstTaxCollected.toFixed(2)}
 					</h3>
-					<span class="text-[11px] text-slate-400">5% GST Statutory Reserve</span>
+					<span class="text-[11px] text-zinc-400">5% GST Collected</span>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- TAB 2: COMPLETE MENU & DISHES MANAGEMENT -->
+	{#if activeTab === 'MENU'}
+		<div class="space-y-6">
+			<!-- Header Action Bar -->
+			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-zinc-900 border border-zinc-800 text-white">
+				<div>
+					<h3 class="font-black text-lg text-white">Menu Engineering & Catalog</h3>
+					<p class="text-xs text-zinc-400">Categories, food items, station routing, allergens, and CSV bulk import</p>
+				</div>
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						onclick={() => (csvImportModal = true)}
+						class="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs border border-zinc-700 transition"
+					>
+						📥 Bulk CSV Import
+					</button>
+					<button
+						type="button"
+						onclick={() => (newCategoryModal = true)}
+						class="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs border border-zinc-700 transition"
+					>
+						+ Add Category
+					</button>
+					<button
+						type="button"
+						onclick={() => (newItemModal = true)}
+						class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-md transition"
+					>
+						+ Add Food Item
+					</button>
 				</div>
 			</div>
 
-			<!-- Payment Method Distribution -->
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-				<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<span class="text-2xl p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600">📲</span>
-						<div>
-							<h4 class="font-bold text-sm text-slate-900 dark:text-white">UPI QR Payments</h4>
-							<p class="text-xs text-slate-400">68% of total volume</p>
-						</div>
-					</div>
-					<span class="font-black text-base text-slate-900 dark:text-white">₹29,002</span>
-				</div>
+			<!-- Categories & Items Hierarchy -->
+			{#if menuLoading}
+				<div class="py-16 text-center text-zinc-400">Loading restaurant menu...</div>
+			{:else}
+				<div class="space-y-6">
+					{#each categories as category}
+						<div class="p-5 rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-4">
+							<div class="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+								<div class="flex items-center gap-2">
+									<h4 class="font-black text-base text-zinc-900 dark:text-white">{category.name}</h4>
+									<span class="text-xs text-zinc-400">({category.items.length} items)</span>
+								</div>
+								<button
+									type="button"
+									onclick={() => handleDeleteCategory(category.id)}
+									class="text-xs text-zinc-400 hover:text-red-500 transition"
+								>
+									Delete Category ✕
+								</button>
+							</div>
 
-				<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<span class="text-2xl p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600">💵</span>
-						<div>
-							<h4 class="font-bold text-sm text-slate-900 dark:text-white">Cash at Table</h4>
-							<p class="text-xs text-slate-400">18% of total volume</p>
+							<!-- Items Table -->
+							<div class="overflow-x-auto">
+								<table class="w-full text-left text-xs">
+									<thead>
+										<tr class="text-zinc-400 border-b border-zinc-100 dark:border-zinc-800 font-bold uppercase tracking-wider pb-2">
+											<th class="py-2">Item Name</th>
+											<th class="py-2">Price</th>
+											<th class="py-2">Food Type</th>
+											<th class="py-2">Kitchen Station</th>
+											<th class="py-2">Allergens</th>
+											<th class="py-2">Stock Availability</th>
+											<th class="py-2 text-right">Actions</th>
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+										{#each category.items as item}
+											<tr class="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/40 transition">
+												<td class="py-2.5 font-bold text-zinc-900 dark:text-white">
+													{item.name}
+												</td>
+												<td class="py-2.5 font-mono text-zinc-900 dark:text-white font-bold">
+													₹{item.price}
+												</td>
+												<td class="py-2.5">
+													<span class="px-2 py-0.5 rounded text-[10px] font-bold {item.food_type === 'VEG' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'}">
+														{item.food_type}
+													</span>
+												</td>
+												<td class="py-2.5 font-semibold text-zinc-600 dark:text-zinc-400">
+													{item.kitchen_station || 'MAIN_KITCHEN'}
+												</td>
+												<td class="py-2.5 text-zinc-500">
+													{item.allergens && item.allergens.length > 0 ? item.allergens.join(', ') : 'None'}
+												</td>
+												<td class="py-2.5">
+													<button
+														type="button"
+														onclick={() => handleToggleAvailability(item)}
+														class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition {item.is_available ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800'}"
+													>
+														{item.is_available ? 'In Stock ✓' : "86'd (Sold Out)"}
+													</button>
+												</td>
+												<td class="py-2.5 text-right">
+													<button
+														type="button"
+														onclick={() => handleDeleteItem(item.id)}
+														class="text-xs text-red-500 hover:underline"
+													>
+														Delete
+													</button>
+												</td>
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
 						</div>
-					</div>
-					<span class="font-black text-base text-slate-900 dark:text-white">₹7,677</span>
+					{/each}
 				</div>
+			{/if}
+		</div>
+	{/if}
 
-				<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 flex items-center justify-between">
-					<div class="flex items-center gap-3">
-						<span class="text-2xl p-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600">💳</span>
-						<div>
-							<h4 class="font-bold text-sm text-slate-900 dark:text-white">Credit / Debit Cards</h4>
-							<p class="text-xs text-slate-400">14% of total volume</p>
-						</div>
-					</div>
-					<span class="font-black text-base text-slate-900 dark:text-white">₹5,971</span>
-				</div>
-			</div>
-
-			<!-- Top Selling Dishes Leaderboard -->
-			<div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
-				<div class="flex items-center justify-between">
+	<!-- TAB 3: DYNAMIC STOREFRONT CMS & SECTIONS -->
+	{#if activeTab === 'CMS'}
+		<div class="space-y-6 max-w-4xl">
+			<!-- Dynamic Sections Manager -->
+			<div class="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 text-white space-y-4 shadow-xs">
+				<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
 					<div>
-						<h3 class="font-black text-base text-slate-900 dark:text-white">🏆 Best Selling Dishes Today</h3>
-						<p class="text-xs text-slate-400">Track which items drive the highest restaurant revenue</p>
+						<h3 class="font-black text-lg text-white">Dynamic Storefront Sections</h3>
+						<p class="text-xs text-zinc-400">Add, remove, reorder, and toggle sections published on the public website</p>
 					</div>
+					<button
+						type="button"
+						onclick={() => (addSectionModal = true)}
+						class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition"
+					>
+						+ Add Section
+					</button>
 				</div>
 
+				{#if cmsSectionsLoading}
+					<div class="py-8 text-center text-zinc-400 text-xs">Loading website sections...</div>
+				{:else if cmsSections.length === 0}
+					<div class="py-8 text-center text-zinc-500 text-xs">No dynamic sections configured yet. Add one above!</div>
+				{:else}
+					<div class="space-y-2">
+						{#each cmsSections as section, idx (section.id)}
+							<div class="p-3.5 rounded-2xl bg-zinc-800/80 border border-zinc-700 flex items-center justify-between text-xs">
+								<div class="flex items-center gap-3">
+									<div class="flex flex-col gap-1">
+										<button
+											type="button"
+											disabled={idx === 0}
+											onclick={() => moveSection(idx, 'UP')}
+											class="w-5 h-5 rounded bg-zinc-700 hover:bg-zinc-600 text-white flex items-center justify-center text-[10px] disabled:opacity-30"
+										>
+											▲
+										</button>
+										<button
+											type="button"
+											disabled={idx === cmsSections.length - 1}
+											onclick={() => moveSection(idx, 'DOWN')}
+											class="w-5 h-5 rounded bg-zinc-700 hover:bg-zinc-600 text-white flex items-center justify-center text-[10px] disabled:opacity-30"
+										>
+											▼
+										</button>
+									</div>
+									<div>
+										<span class="font-bold text-white text-sm uppercase tracking-wide">
+											{section.section_type}
+										</span>
+										<p class="text-[11px] text-zinc-400">
+											{section.content?.title || section.content?.heading || 'Custom Section Content'}
+										</p>
+									</div>
+								</div>
+
+								<div class="flex items-center gap-2">
+									<button
+										type="button"
+										onclick={() => toggleSectionStatus(section)}
+										class="px-2.5 py-1 rounded-lg font-bold text-[10px] uppercase transition {section.is_enabled ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-zinc-700 text-zinc-400'}"
+									>
+										{section.is_enabled ? 'Published' : 'Draft'}
+									</button>
+									<button
+										type="button"
+										onclick={() => handleDeleteSection(section.id)}
+										class="text-xs text-red-400 hover:text-red-300 p-1"
+									>
+										✕
+									</button>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Custom HTML Landing Switcher -->
+			<div class="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 text-white space-y-4 shadow-xs">
+				<h3 class="font-black text-lg text-white">Custom Landing Override (Sandboxed)</h3>
+				<div class="flex items-center gap-3">
+					<button
+						type="button"
+						onclick={() => (cmsLandingMode = 'DEFAULT')}
+						class="px-4 py-2 rounded-xl text-xs font-bold transition {cmsLandingMode === 'DEFAULT' ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400'}"
+					>
+						Dynamic Sections Mode
+					</button>
+					<button
+						type="button"
+						onclick={() => (cmsLandingMode = 'CUSTOM_HTML')}
+						class="px-4 py-2 rounded-xl text-xs font-bold transition {cmsLandingMode === 'CUSTOM_HTML' ? 'bg-purple-600 text-white' : 'bg-zinc-800 text-zinc-400'}"
+					>
+						Raw Custom HTML Mode
+					</button>
+				</div>
+
+				{#if cmsLandingMode === 'CUSTOM_HTML'}
+					<textarea
+						bind:value={cmsCustomHtml}
+						rows="6"
+						class="w-full text-xs p-3 font-mono rounded-xl bg-zinc-950 border border-zinc-700 text-emerald-300 focus:outline-none"
+					></textarea>
+				{/if}
+
+				<div class="flex items-center justify-between pt-2">
+					<button
+						type="button"
+						onclick={saveStorefrontCms}
+						class="px-5 py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-black text-xs shadow-md transition"
+					>
+						Save Storefront Settings
+					</button>
+					{#if cmsSaveSuccess}
+						<span class="text-xs text-emerald-400 font-bold">✓ Saved successfully!</span>
+					{/if}
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<!-- TAB 4: STAFF MANAGEMENT -->
+	{#if activeTab === 'STAFF'}
+		<div class="space-y-4">
+			<div class="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-xs space-y-4">
+				<h3 class="font-black text-base text-zinc-900 dark:text-white">Active Operational Staff</h3>
 				<div class="overflow-x-auto">
 					<table class="w-full text-left text-xs">
 						<thead>
-							<tr class="border-b border-slate-100 dark:border-slate-800 text-slate-400 font-bold uppercase tracking-wider">
-								<th class="py-2.5">Dish Name</th>
-								<th class="py-2.5">Category</th>
-								<th class="py-2.5">Portions Sold</th>
-								<th class="py-2.5">Total Revenue</th>
-								<th class="py-2.5 text-right">Performance</th>
+							<tr class="text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 font-bold uppercase tracking-wider pb-2">
+								<th class="py-2">Name</th>
+								<th class="py-2">Role</th>
+								<th class="py-2">Shift</th>
+								<th class="py-2">Phone</th>
+								<th class="py-2">Duty</th>
 							</tr>
 						</thead>
-						<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-							{#each topSoldDishes as dish, idx}
-								<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
-									<td class="py-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-										<span class="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] text-slate-500 font-bold">
-											{idx + 1}
-										</span>
-										<span>{dish.name}</span>
-										<span class="text-[9px] px-1 rounded font-bold {dish.type === 'VEG' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
-											{dish.type}
-										</span>
-									</td>
-									<td class="py-3 text-slate-500 dark:text-slate-400">{dish.category}</td>
-									<td class="py-3 font-semibold text-slate-800 dark:text-slate-200">{dish.portionsSold} plates</td>
-									<td class="py-3 font-black text-blue-600 dark:text-blue-400">₹{dish.revenue.toLocaleString('en-IN')}</td>
-									<td class="py-3 text-right">
-										<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-											🔥 High Velocity
+						<tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
+							{#each staffList as staff}
+								<tr>
+									<td class="py-3 font-bold text-zinc-900 dark:text-white">{staff.name}</td>
+									<td class="py-3 font-semibold text-zinc-500">{staff.role}</td>
+									<td class="py-3 text-zinc-500">{staff.shift}</td>
+									<td class="py-3 font-mono text-zinc-500">{staff.phone}</td>
+									<td class="py-3">
+										<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+											{staff.status}
 										</span>
 									</td>
 								</tr>
@@ -360,349 +737,193 @@
 		</div>
 	{/if}
 
-	<!-- TAB 2: STAFF MANAGEMENT -->
-	{#if activeTab === 'STAFF'}
-		<div class="space-y-4">
-			<div class="flex items-center justify-between">
-				<div>
-					<h3 class="font-black text-base text-slate-900 dark:text-white">Active Restaurant Team</h3>
-					<p class="text-xs text-slate-400">Manage Kitchen Chefs, Waitstaff, Delivery Drivers, and Shift Schedules</p>
-				</div>
-				<button
-					type="button"
-					onclick={() => (newStaffModal = true)}
-					class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs transition active:scale-95"
-				>
-					+ Add Staff Member
-				</button>
-			</div>
-
-			<div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
-				<table class="w-full text-left text-xs">
-					<thead>
-						<tr class="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
-							<th class="p-3.5">Name</th>
-							<th class="p-3.5">Role</th>
-							<th class="p-3.5">Assigned Shift</th>
-							<th class="p-3.5">Phone</th>
-							<th class="p-3.5">Duty Status</th>
-							<th class="p-3.5 text-right">Actions</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-						{#each staffList as staff}
-							<tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
-								<td class="p-3.5 font-bold text-slate-900 dark:text-white">{staff.name}</td>
-								<td class="p-3.5">
-									<span class="px-2 py-0.5 rounded-full text-[10px] font-bold {staff.role === 'Chef' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : staff.role === 'Waiter' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : staff.role === 'Driver' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' : 'bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300'}">
-										{staff.role === 'Chef' ? '👨‍🍳 Chef' : staff.role === 'Waiter' ? '🛎️ Waiter' : staff.role === 'Driver' ? '🛵 Driver' : '📊 Manager'}
-									</span>
-								</td>
-								<td class="p-3.5 text-slate-500 dark:text-slate-400">{staff.shift}</td>
-								<td class="p-3.5 font-mono text-slate-600 dark:text-slate-300">{staff.phone}</td>
-								<td class="p-3.5">
-									<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold {staff.status === 'ON_DUTY' ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}">
-										<span class="w-1.5 h-1.5 rounded-full {staff.status === 'ON_DUTY' ? 'bg-emerald-500' : 'bg-slate-400'}"></span>
-										{staff.status === 'ON_DUTY' ? 'On Duty' : 'Off Shift'}
-									</span>
-								</td>
-								<td class="p-3.5 text-right">
-									<button
-										type="button"
-										onclick={() => toggleStaffDuty(staff.id)}
-										class="px-2.5 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-									>
-										{staff.status === 'ON_DUTY' ? 'Set Off Duty' : 'Set On Duty'}
-									</button>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		</div>
-	{/if}
-
-	<!-- TAB: STOREFRONT CMS & WIDGET CONFIGURATION -->
-	{#if activeTab === 'CMS'}
-		<div class="space-y-6 max-w-4xl">
-			<!-- Header Banner -->
-			<div class="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 text-white space-y-2 shadow-xs">
-				<div class="flex items-center gap-2.5">
-					<span class="text-2xl p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">🌐</span>
-					<div>
-						<h3 class="font-black text-lg text-white">Storefront CMS & Modular Widgets</h3>
-						<p class="text-xs text-zinc-400">
-							Customize your restaurant's public landing page with custom HTML or choose pre-designed luxury templates, while embedding our interactive ordering & table reservation widgets.
-						</p>
-					</div>
-				</div>
-			</div>
-
-			<!-- Mode Selector -->
-			<div class="p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xs">
-				<span class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Storefront Layout Engine</span>
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-					<button
-						type="button"
-						onclick={() => (cmsLandingMode = 'DEFAULT')}
-						class="p-4 rounded-2xl border text-left transition {cmsLandingMode === 'DEFAULT'
-							? 'bg-zinc-950 text-white border-amber-400 ring-2 ring-amber-400/50'
-							: 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'}"
-					>
-						<div class="flex items-center justify-between mb-1">
-							<h4 class="font-black text-sm">⭐ Default Responsive Hero</h4>
-							<span class="text-xs">{cmsLandingMode === 'DEFAULT' ? '● Active' : '○ Select'}</span>
-						</div>
-						<p class="text-xs text-zinc-400 leading-relaxed">
-							Uses the platform's high-contrast charcoal hero, 4.9★ diner badge, achievements, and integrated action gateways.
-						</p>
-					</button>
-
-					<button
-						type="button"
-						onclick={() => (cmsLandingMode = 'CUSTOM_HTML')}
-						class="p-4 rounded-2xl border text-left transition {cmsLandingMode === 'CUSTOM_HTML'
-							? 'bg-zinc-950 text-white border-purple-400 ring-2 ring-purple-400/50'
-							: 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'}"
-					>
-						<div class="flex items-center justify-between mb-1">
-							<h4 class="font-black text-sm">🎨 Custom Tenant HTML / CMS</h4>
-							<span class="text-xs">{cmsLandingMode === 'CUSTOM_HTML' ? '● Active' : '○ Select'}</span>
-						</div>
-						<p class="text-xs text-zinc-400 leading-relaxed">
-							Provide your restaurant's custom HTML/CSS and place our interactive Resto widgets anywhere via placeholder tags.
-						</p>
-					</button>
-				</div>
-			</div>
-
-			<!-- Custom HTML CMS Editor -->
-			{#if cmsLandingMode === 'CUSTOM_HTML'}
-				<div class="p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-5 shadow-xs">
-					<!-- Preset Template Chooser -->
-					<div class="space-y-2">
-						<span class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Quick-Load Design Presets</span>
-						<div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-							{#each cmsTemplates as tpl}
-								<button
-									type="button"
-									onclick={() => applyCmsTemplate(tpl.html)}
-									class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-left transition"
-								>
-									<h5 class="font-bold text-xs text-zinc-900 dark:text-white mb-0.5">{tpl.name}</h5>
-									<p class="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">{tpl.desc}</p>
-								</button>
-							{/each}
-						</div>
-					</div>
-
-					<!-- Widget Placeholders Helper -->
-					<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 space-y-2.5">
-						<div class="flex items-center justify-between">
-							<span class="font-bold text-amber-400">📌 Embeddable Resto Widgets & Triggers</span>
-							<span class="text-[10px] text-zinc-400">Click to insert at cursor/end</span>
-						</div>
-						<p class="text-[11px] text-zinc-400">
-							Copy or click these tags to inject our interactive booking and ordering components into your custom HTML:
-						</p>
-						<div class="flex flex-wrap gap-2">
-							<button
-								type="button"
-								onclick={() => insertWidgetSnippet('<div data-resto-widget="actions"></div>')}
-								class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/30 font-mono text-[11px] transition"
-							>
-								+ &lt;div data-resto-widget="actions"&gt;&lt;/div&gt;
-							</button>
-							<button
-								type="button"
-								onclick={() => insertWidgetSnippet('<button data-resto-action="book" class="px-4 py-2 bg-amber-400 text-black font-bold rounded-xl">Book a Table</button>')}
-								class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-purple-300 border border-purple-500/30 font-mono text-[11px] transition"
-							>
-								+ Table Booking Button
-							</button>
-							<button
-								type="button"
-								onclick={() => insertWidgetSnippet('<a href="#menu-section" class="px-4 py-2 bg-white text-black font-bold rounded-xl">Order Online</a>')}
-								class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-emerald-300 border border-emerald-500/30 font-mono text-[11px] transition"
-							>
-								+ Order Online Link
-							</button>
-						</div>
-					</div>
-
-					<!-- HTML Codearea -->
-					<div class="space-y-1.5">
-						<label for="cms-html-editor" class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Custom Landing Page HTML / Tailwind Markup</label>
-						<textarea
-							id="cms-html-editor"
-							bind:value={cmsCustomHtml}
-							rows="12"
-							placeholder="Paste your custom hotel landing HTML here..."
-							class="w-full font-mono text-xs p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-emerald-400 focus:outline-none focus:border-amber-400 leading-relaxed"
-						></textarea>
-					</div>
-				</div>
-			{/if}
-
-			<!-- Actions & Feedback -->
-			<div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-				<div class="flex items-center gap-2">
-					<button
-						type="button"
-						onclick={saveStorefrontCms}
-						class="px-6 py-3 rounded-2xl bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 text-white dark:text-zinc-900 font-extrabold text-xs transition shadow-md active:scale-95 flex items-center gap-2"
-					>
-						<span>💾</span>
-						<span>Save & Publish Storefront</span>
-					</button>
-
-					<button
-						type="button"
-						onclick={resetToDefaultStorefront}
-						class="px-4 py-3 rounded-2xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 font-bold text-xs transition active:scale-95"
-					>
-						Reset to Default
-					</button>
-				</div>
-
-				<div class="flex items-center gap-3">
-					{#if cmsSaveSuccess}
-						<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold animate-in fade-in">
-							✓ Storefront Updated Live!
-						</span>
-					{/if}
-
-					<a
-						href="/"
-						target="_blank"
-						class="px-4 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-zinc-700 transition flex items-center gap-1.5"
-					>
-						<span>👁️ Preview Live Storefront →</span>
-					</a>
-				</div>
-			</div>
-		</div>
-	{/if}
-
-	<!-- TAB 3: RESTAURANT & THEME SETTINGS -->
+	<!-- TAB 5: RESTAURANT SETTINGS -->
 	{#if activeTab === 'SETTINGS'}
-		<div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs max-w-2xl space-y-5">
-			<div>
-				<h3 class="font-black text-lg text-slate-900 dark:text-white">Tenant Branding & Tax Configuration</h3>
-				<p class="text-xs text-slate-400">Configure restaurant details, logo, and theme colors</p>
-			</div>
-
-			<div class="space-y-4 text-xs">
+		<div class="space-y-6 max-w-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-3xl shadow-xs text-left">
+			<h3 class="font-black text-lg text-zinc-900 dark:text-white">Restaurant Configuration</h3>
+			<div class="space-y-3 text-xs">
 				<div>
-					<span class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Restaurant Name</span>
+					<span class="font-bold text-zinc-500 block mb-1">Restaurant Name</span>
 					<input
 						type="text"
 						bind:value={$currentTenant.name}
-						class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+						class="w-full p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
 					/>
 				</div>
-
-				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<span class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Contact Phone</span>
-						<input
-							type="text"
-							bind:value={$currentTenant.phone}
-							class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-						/>
-					</div>
-					<div>
-						<span class="block font-bold text-slate-700 dark:text-slate-300 mb-1">GST Tax Rate (%)</span>
-						<input
-							type="number"
-							bind:value={$currentTenant.settings.tax_gst_percentage}
-							class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-						/>
-					</div>
-				</div>
-
 				<div>
-					<span class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Primary Theme Brand Color</span>
-					<div class="flex items-center gap-3">
-						<input
-							type="color"
-							bind:value={$currentTenant.branding.primary_color}
-							class="w-10 h-10 rounded-xl cursor-pointer border border-slate-200 dark:border-slate-700"
-						/>
-						<span class="font-mono text-slate-600 dark:text-slate-300">{$currentTenant.branding.primary_color}</span>
-						<button
-							type="button"
-							onclick={() => applyTheme($currentTenant)}
-							class="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-800 dark:text-slate-200 font-semibold text-xs"
-						>
-							Apply Theme Live
-						</button>
-					</div>
+					<span class="font-bold text-zinc-500 block mb-1">GST Tax Rate (%)</span>
+					<input
+						type="number"
+						bind:value={$currentTenant.settings.tax_gst_percentage}
+						class="w-full p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+					/>
 				</div>
-
-				<button
-					type="button"
-					onclick={() => alert('Settings saved successfully!')}
-					class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition shadow-xs"
-				>
-					Save Configuration Changes
-				</button>
+				<div>
+					<span class="font-bold text-zinc-500 block mb-1">Contact Phone</span>
+					<input
+						type="text"
+						bind:value={$currentTenant.phone}
+						class="w-full p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+					/>
+				</div>
+				<div>
+					<span class="font-bold text-zinc-500 block mb-1">Address</span>
+					<input
+						type="text"
+						bind:value={$currentTenant.address}
+						class="w-full p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+					/>
+				</div>
 			</div>
 		</div>
 	{/if}
 </div>
 
-<!-- Modal: Add New Staff Member -->
-{#if newStaffModal}
-	<div class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-		<div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-sm w-full p-6 shadow-2xl space-y-4">
-			<div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-				<h3 class="font-black text-base text-slate-900 dark:text-white">Add Team Member</h3>
-				<button type="button" onclick={() => (newStaffModal = false)} class="text-xs text-slate-400">✕</button>
+<!-- Modal: Add Category -->
+{#if newCategoryModal}
+	<div class="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+		<div class="bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+			<h3 class="font-bold text-base text-white">Create Menu Category</h3>
+			<input
+				type="text"
+				bind:value={newCategoryName}
+				placeholder="Category Name (e.g. Clay Oven Specialties)"
+				class="w-full text-xs p-3 rounded-xl bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:outline-none"
+			/>
+			<div class="flex items-center justify-end gap-2 pt-2">
+				<button type="button" onclick={() => (newCategoryModal = false)} class="px-4 py-2 text-xs text-zinc-400">Cancel</button>
+				<button type="button" onclick={handleAddCategory} class="px-5 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs">Create Category</button>
 			</div>
+		</div>
+	</div>
+{/if}
 
+<!-- Modal: Add Food Item -->
+{#if newItemModal}
+	<div class="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+		<div class="bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+			<h3 class="font-bold text-base text-white">Add New Food Item</h3>
 			<div class="space-y-3 text-xs">
 				<div>
-					<span class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Full Name</span>
-					<input
-						type="text"
-						bind:value={newStaffName}
-						placeholder="e.g. Ramesh Chandra"
-						class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-					/>
-				</div>
-
-				<div>
-					<span class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Role</span>
-					<select
-						bind:value={newStaffRole}
-						class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-					>
-						<option value="Chef">Chef (Kitchen KDS)</option>
-						<option value="Waiter">Waiter (Floor POS)</option>
-						<option value="Driver">Driver (Delivery Fleet)</option>
-						<option value="Manager">Manager / Floor Captain</option>
+					<span class="text-zinc-400 block mb-1">Menu Category</span>
+					<select bind:value={newItemCategoryId} class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white">
+						{#each categories as cat}
+							<option value={cat.id}>{cat.name}</option>
+						{/each}
 					</select>
 				</div>
-
 				<div>
-					<span class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Mobile Number</span>
-					<input
-						type="tel"
-						bind:value={newStaffPhone}
-						placeholder="+91 98765 00000"
-						class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-					/>
+					<span class="text-zinc-400 block mb-1">Dish Name</span>
+					<input type="text" bind:value={newItemName} placeholder="e.g. Awadhi Dum Biryani" class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white" />
 				</div>
-
-				<button
-					type="button"
-					onclick={addStaffMember}
-					class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition shadow-xs mt-2"
-				>
-					Confirm & Create Account
+				<div>
+					<span class="text-zinc-400 block mb-1">Description</span>
+					<textarea bind:value={newItemDescription} placeholder="Aromatic basmati rice sealed with saffron..." rows="2" class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white"></textarea>
+				</div>
+				<div class="grid grid-cols-2 gap-2">
+					<div>
+						<span class="text-zinc-400 block mb-1">Price (₹)</span>
+						<input type="number" bind:value={newItemPrice} class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white" />
+					</div>
+					<div>
+						<span class="text-zinc-400 block mb-1">Food Type</span>
+						<select bind:value={newItemFoodType} class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white">
+							<option value="VEG">🟢 Pure Veg</option>
+							<option value="NON_VEG">🔴 Non-Veg</option>
+							<option value="EGG">🟡 Egg</option>
+							<option value="VEGAN">🌱 Vegan</option>
+						</select>
+					</div>
+				</div>
+				<div class="grid grid-cols-2 gap-2">
+					<div>
+						<span class="text-zinc-400 block mb-1">Prep Time (mins)</span>
+						<input type="number" bind:value={newItemPrepTime} class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white" />
+					</div>
+					<div>
+						<span class="text-zinc-400 block mb-1">Kitchen Station</span>
+						<select bind:value={newItemStation} class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white">
+							<option value="MAIN_KITCHEN">MAIN_KITCHEN</option>
+							<option value="GRILL">GRILL</option>
+							<option value="BAKERY">BAKERY</option>
+							<option value="BEVERAGES">BEVERAGES</option>
+							<option value="DESSERTS">DESSERTS</option>
+							<option value="EXPO">EXPO</option>
+						</select>
+					</div>
+				</div>
+			</div>
+			<div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+				<button type="button" onclick={() => (newItemModal = false)} class="px-4 py-2 text-xs text-zinc-400">Cancel</button>
+				<button type="button" disabled={isSubmittingMenu} onclick={handleAddMenuItem} class="px-5 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs shadow-md">
+					{isSubmittingMenu ? 'Saving...' : 'Add Food Item'}
 				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Modal: Bulk CSV Import -->
+{#if csvImportModal}
+	<div class="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+		<div class="bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+			<div class="space-y-1">
+				<h3 class="font-bold text-base text-white">Bulk CSV Menu Import</h3>
+				<p class="text-xs text-zinc-400">Paste your CSV records with headers: category, name, description, price, food_type, preparation_time_mins, kitchen_station, allergens</p>
+			</div>
+
+			<textarea
+				bind:value={csvText}
+				rows="7"
+				placeholder={`category,name,description,price,food_type,preparation_time_mins,kitchen_station,allergens
+Starters,Paneer Tikka,Clay oven roasted,280,VEG,15,GRILL,DAIRY
+Breads,Garlic Naan,Clay tandoor baked,70,VEG,8,BAKERY,GLUTEN;DAIRY`}
+				class="w-full text-xs p-3 font-mono rounded-xl bg-zinc-950 border border-zinc-700 text-emerald-300 focus:outline-none"
+			></textarea>
+
+			{#if csvImportResult}
+				<div class="p-2.5 rounded-xl bg-emerald-950 text-emerald-300 text-xs font-bold border border-emerald-800">
+					✓ {csvImportResult}
+				</div>
+			{/if}
+
+			<div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+				<button type="button" onclick={() => (csvImportModal = false)} class="px-4 py-2 text-xs text-zinc-400">Cancel</button>
+				<button type="button" disabled={isSubmittingMenu || !csvText.trim()} onclick={handleBulkCSVImport} class="px-5 py-2 rounded-xl bg-emerald-500 text-zinc-950 font-black text-xs shadow-md">
+					{isSubmittingMenu ? 'Importing...' : 'Run Bulk Import →'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Modal: Add Dynamic CMS Section -->
+{#if addSectionModal}
+	<div class="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+		<div class="bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+			<h3 class="font-bold text-base text-white">Add Storefront Section</h3>
+			<div class="space-y-3 text-xs">
+				<div>
+					<span class="text-zinc-400 block mb-1">Section Type</span>
+					<select bind:value={newSectionType} class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white">
+						<option value="story">📜 Culinary Heritage & Story</option>
+						<option value="ambience_gallery">🖼️ Ambience & Spaces Gallery</option>
+						<option value="signature_dishes">✨ Signature Dishes Highlights</option>
+						<option value="dining_guidelines">🕰️ Hours & Concierge Guidelines</option>
+					</select>
+				</div>
+				<div>
+					<span class="text-zinc-400 block mb-1">Section Title</span>
+					<input type="text" bind:value={newSectionTitle} placeholder="e.g. Master Chef Credentials" class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white" />
+				</div>
+				<div>
+					<span class="text-zinc-400 block mb-1">Section Subtitle / Tagline</span>
+					<input type="text" bind:value={newSectionSubtitle} placeholder="e.g. 25 Years of Awadhi Mastery" class="w-full p-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-white" />
+				</div>
+			</div>
+			<div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+				<button type="button" onclick={() => (addSectionModal = false)} class="px-4 py-2 text-xs text-zinc-400">Cancel</button>
+				<button type="button" onclick={handleAddSection} class="px-5 py-2 rounded-xl bg-purple-600 text-white font-bold text-xs shadow-md">Add Section</button>
 			</div>
 		</div>
 	</div>

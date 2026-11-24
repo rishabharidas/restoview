@@ -111,19 +111,33 @@
 						🚪 Sign Out
 					</button>
 				{:else}
-					<!-- Guest Navigation Controls -->
+					<!-- Minimal Guest Navigation -->
 					<a
 						href="/"
-						class="px-3 py-1.5 rounded-xl text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition font-bold"
+						class="px-2.5 py-1.5 rounded-xl text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition font-bold"
 					>
-						🍽️ Menu
+						Home
+					</a>
+
+					<a
+						href="/#about-section"
+						class="hidden sm:inline-flex px-2.5 py-1.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition font-semibold"
+					>
+						About
+					</a>
+
+					<a
+						href="/#menu-section"
+						class="px-2.5 py-1.5 rounded-xl text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition font-bold"
+					>
+						Menu
 					</a>
 
 					<a
 						href="/table/qr_token_table_1_test_resto"
-						class="hidden sm:inline-flex px-3 py-1.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
+						class="hidden md:inline-flex px-2.5 py-1.5 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition"
 					>
-						📱 Dine-In Table
+						📱 Dine-In QR
 					</a>
 
 					<!-- Theme Switcher -->

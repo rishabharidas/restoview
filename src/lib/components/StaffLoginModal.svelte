@@ -5,17 +5,31 @@
 	const isModalOpen = auth.loginModalOpen;
 	let username = $state('');
 	let password = $state('');
-	let selectedRole = $state<StaffRole>('WAITER');
+	let loginError = $state('');
+	let isSubmitting = $state(false);
 
-	function handleCustomLogin(e: Event) {
+	async function handleCustomLogin(e: Event) {
 		e.preventDefault();
-		auth.loginAsRole(selectedRole);
-		const dest = auth.getRoleDestination(selectedRole);
-		window.location.href = dest;
+		loginError = '';
+		if (!username || !password) {
+			loginError = 'Please enter both username and password';
+			return;
+		}
+
+		isSubmitting = true;
+		try {
+			const staff = await auth.loginWithCredentials(username, password);
+			const dest = auth.getRoleDestination(staff.role);
+			window.location.href = dest;
+		} catch (err: any) {
+			loginError = err.message || 'Login failed. Please verify your credentials.';
+		} finally {
+			isSubmitting = false;
+		}
 	}
 
-	function handleQuickLogin(role: StaffRole) {
-		auth.loginAsRole(role);
+	async function handleQuickLogin(role: StaffRole) {
+		await auth.loginAsRole(role);
 		const dest = auth.getRoleDestination(role);
 		window.location.href = dest;
 	}
@@ -131,11 +145,18 @@
 					/>
 				</div>
 
+				{#if loginError}
+					<div class="p-2.5 rounded-xl bg-red-950/80 border border-red-800 text-red-200 text-[11px] font-medium">
+						⚠️ {loginError}
+					</div>
+				{/if}
+
 				<button
 					type="submit"
-					class="w-full py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-extrabold text-xs shadow-md transition active:scale-98"
+					disabled={isSubmitting}
+					class="w-full py-2.5 rounded-xl bg-zinc-100 hover:bg-white text-zinc-900 font-extrabold text-xs shadow-md transition active:scale-98 disabled:opacity-50"
 				>
-					Sign In to Operations →
+					{isSubmitting ? 'Authenticating...' : 'Sign In to Operations →'}
 				</button>
 			</form>
 		</div>
