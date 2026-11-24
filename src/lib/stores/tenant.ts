@@ -14,7 +14,9 @@ export const defaultTenant: Tenant = {
 		accent_color: '#f59e0b',
 		font_family: 'Inter, sans-serif',
 		logo_url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&auto=format&fit=crop&q=80',
-		hero_banner_url: ''
+		hero_banner_url: '',
+		custom_landing_html: '',
+		landing_mode: 'DEFAULT'
 	},
 	settings: {
 		currency: 'INR',

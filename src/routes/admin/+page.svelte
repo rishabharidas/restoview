@@ -3,7 +3,113 @@
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 
 	// Tab navigation
-	let activeTab = $state<'ANALYTICS' | 'STAFF' | 'MENU' | 'SETTINGS'>('ANALYTICS');
+	let activeTab = $state<'ANALYTICS' | 'STAFF' | 'CMS' | 'SETTINGS'>('ANALYTICS');
+
+	// Storefront CMS states
+	let cmsLandingMode = $state<'DEFAULT' | 'CUSTOM_HTML'>($currentTenant.branding.landing_mode ?? 'DEFAULT');
+	let cmsCustomHtml = $state($currentTenant.branding.custom_landing_html ?? '');
+	let cmsSaveSuccess = $state(false);
+
+	const cmsTemplates = [
+		{
+			id: 'luxury_grill',
+			name: '👑 Royal Awadhi Charcoal Grill',
+			desc: 'Dark ambient luxury with chef credentials and embedded action widget',
+			html: `<div class="relative overflow-hidden rounded-3xl bg-zinc-950 text-white p-8 sm:p-12 border border-zinc-800 shadow-2xl">
+  <div class="max-w-3xl space-y-4">
+    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+      ⭐ Michelin Guide Selected 2025/26
+    </span>
+    <h1 class="text-4xl sm:text-6xl font-black tracking-tight">The Royal Charcoal Hearth</h1>
+    <p class="text-zinc-300 text-sm sm:text-base leading-relaxed">
+      Welcome to an unmatched royal feast. Slow-simmered Awadhi dum delicacies, live 800°F clay tandoor kebabs, and cold-pressed botanical refreshments.
+    </p>
+
+    <!-- 📌 Embedded Resto Platform Action Widget -->
+    <div class="pt-4" data-resto-widget="actions"></div>
+  </div>
+</div>`
+		},
+		{
+			id: 'italian_bistro',
+			name: '🍕 Bella Vista Artisan Ristorante',
+			desc: 'Warm stone & vineyard styling with table booking emphasis',
+			html: `<div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950 via-zinc-900 to-zinc-950 text-white p-8 sm:p-12 border border-amber-900/40 shadow-2xl">
+  <div class="max-w-3xl space-y-4">
+    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+      🌿 100% Imported San Marzano & Sourdough
+    </span>
+    <h1 class="text-4xl sm:text-6xl font-black tracking-tight">Artisan Woodfired Trattoria</h1>
+    <p class="text-zinc-300 text-sm sm:text-base leading-relaxed">
+      Hand-stretched 48-hour fermented sourdough pizzas, hand-rolled bronze-cut pastas, and Tuscan reserve pairings. Reserve your candlelit table or order takeaway.
+    </p>
+
+    <!-- 📌 Embedded Resto Platform Action Widget -->
+    <div class="pt-4" data-resto-widget="actions"></div>
+  </div>
+</div>`
+		},
+		{
+			id: 'cloud_kitchen',
+			name: '⚡ Express Cloud Kitchen Hub',
+			desc: 'High-speed delivery and takeaway focused design',
+			html: `<div class="relative overflow-hidden rounded-3xl bg-zinc-900 text-white p-8 sm:p-10 border border-zinc-700 shadow-xl">
+  <div class="max-w-3xl space-y-3">
+    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+      ⚡ 30-Minute Doorstep Express Guarantee
+    </span>
+    <h1 class="text-3xl sm:text-5xl font-black tracking-tight">Gourmet Feasts Delivered to You</h1>
+    <p class="text-zinc-400 text-xs sm:text-sm">
+      Hot, fresh culinary bowls and platters sealed in hospital-grade thermal boxes with live driver GPS tracking.
+    </p>
+
+    <!-- 📌 Embedded Resto Platform Action Widget -->
+    <div class="pt-4" data-resto-widget="actions"></div>
+  </div>
+</div>`
+		}
+	];
+
+	function applyCmsTemplate(templateHtml: string) {
+		cmsCustomHtml = templateHtml;
+		cmsLandingMode = 'CUSTOM_HTML';
+	}
+
+	function insertWidgetSnippet(snippet: string) {
+		cmsCustomHtml += '\n' + snippet;
+	}
+
+	function saveStorefrontCms() {
+		currentTenant.update((t) => ({
+			...t,
+			branding: {
+				...t.branding,
+				landing_mode: cmsLandingMode,
+				custom_landing_html: cmsCustomHtml
+			}
+		}));
+		cmsSaveSuccess = true;
+		setTimeout(() => {
+			cmsSaveSuccess = false;
+		}, 3000);
+	}
+
+	function resetToDefaultStorefront() {
+		cmsLandingMode = 'DEFAULT';
+		cmsCustomHtml = '';
+		currentTenant.update((t) => ({
+			...t,
+			branding: {
+				...t.branding,
+				landing_mode: 'DEFAULT',
+				custom_landing_html: ''
+			}
+		}));
+		cmsSaveSuccess = true;
+		setTimeout(() => {
+			cmsSaveSuccess = false;
+		}, 3000);
+	}
 
 	// Mock analytics data
 	let todayStats = $state({
@@ -109,6 +215,13 @@
 				class="px-3 py-1.5 rounded-lg transition {activeTab === 'STAFF' ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}"
 			>
 				👥 Staff Management ({staffList.length})
+			</button>
+			<button
+				type="button"
+				onclick={() => (activeTab = 'CMS')}
+				class="px-3 py-1.5 rounded-lg transition {activeTab === 'CMS' ? 'bg-white dark:bg-slate-700 text-purple-700 dark:text-purple-300 shadow-xs' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}"
+			>
+				🌐 Storefront CMS & Widgets
 			</button>
 			<button
 				type="button"
@@ -306,6 +419,168 @@
 						{/each}
 					</tbody>
 				</table>
+			</div>
+		</div>
+	{/if}
+
+	<!-- TAB: STOREFRONT CMS & WIDGET CONFIGURATION -->
+	{#if activeTab === 'CMS'}
+		<div class="space-y-6 max-w-4xl">
+			<!-- Header Banner -->
+			<div class="p-6 rounded-3xl bg-zinc-900 border border-zinc-800 text-white space-y-2 shadow-xs">
+				<div class="flex items-center gap-2.5">
+					<span class="text-2xl p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">🌐</span>
+					<div>
+						<h3 class="font-black text-lg text-white">Storefront CMS & Modular Widgets</h3>
+						<p class="text-xs text-zinc-400">
+							Customize your restaurant's public landing page with custom HTML or choose pre-designed luxury templates, while embedding our interactive ordering & table reservation widgets.
+						</p>
+					</div>
+				</div>
+			</div>
+
+			<!-- Mode Selector -->
+			<div class="p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-4 shadow-xs">
+				<span class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Storefront Layout Engine</span>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<button
+						type="button"
+						onclick={() => (cmsLandingMode = 'DEFAULT')}
+						class="p-4 rounded-2xl border text-left transition {cmsLandingMode === 'DEFAULT'
+							? 'bg-zinc-950 text-white border-amber-400 ring-2 ring-amber-400/50'
+							: 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'}"
+					>
+						<div class="flex items-center justify-between mb-1">
+							<h4 class="font-black text-sm">⭐ Default Responsive Hero</h4>
+							<span class="text-xs">{cmsLandingMode === 'DEFAULT' ? '● Active' : '○ Select'}</span>
+						</div>
+						<p class="text-xs text-zinc-400 leading-relaxed">
+							Uses the platform's high-contrast charcoal hero, 4.9★ diner badge, achievements, and integrated action gateways.
+						</p>
+					</button>
+
+					<button
+						type="button"
+						onclick={() => (cmsLandingMode = 'CUSTOM_HTML')}
+						class="p-4 rounded-2xl border text-left transition {cmsLandingMode === 'CUSTOM_HTML'
+							? 'bg-zinc-950 text-white border-purple-400 ring-2 ring-purple-400/50'
+							: 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300'}"
+					>
+						<div class="flex items-center justify-between mb-1">
+							<h4 class="font-black text-sm">🎨 Custom Tenant HTML / CMS</h4>
+							<span class="text-xs">{cmsLandingMode === 'CUSTOM_HTML' ? '● Active' : '○ Select'}</span>
+						</div>
+						<p class="text-xs text-zinc-400 leading-relaxed">
+							Provide your restaurant's custom HTML/CSS and place our interactive Resto widgets anywhere via placeholder tags.
+						</p>
+					</button>
+				</div>
+			</div>
+
+			<!-- Custom HTML CMS Editor -->
+			{#if cmsLandingMode === 'CUSTOM_HTML'}
+				<div class="p-6 bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 space-y-5 shadow-xs">
+					<!-- Preset Template Chooser -->
+					<div class="space-y-2">
+						<span class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Quick-Load Design Presets</span>
+						<div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+							{#each cmsTemplates as tpl}
+								<button
+									type="button"
+									onclick={() => applyCmsTemplate(tpl.html)}
+									class="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-left transition"
+								>
+									<h5 class="font-bold text-xs text-zinc-900 dark:text-white mb-0.5">{tpl.name}</h5>
+									<p class="text-[10px] text-zinc-500 dark:text-zinc-400 leading-tight">{tpl.desc}</p>
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<!-- Widget Placeholders Helper -->
+					<div class="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 space-y-2.5">
+						<div class="flex items-center justify-between">
+							<span class="font-bold text-amber-400">📌 Embeddable Resto Widgets & Triggers</span>
+							<span class="text-[10px] text-zinc-400">Click to insert at cursor/end</span>
+						</div>
+						<p class="text-[11px] text-zinc-400">
+							Copy or click these tags to inject our interactive booking and ordering components into your custom HTML:
+						</p>
+						<div class="flex flex-wrap gap-2">
+							<button
+								type="button"
+								onclick={() => insertWidgetSnippet('<div data-resto-widget="actions"></div>')}
+								class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-amber-300 border border-amber-500/30 font-mono text-[11px] transition"
+							>
+								+ &lt;div data-resto-widget="actions"&gt;&lt;/div&gt;
+							</button>
+							<button
+								type="button"
+								onclick={() => insertWidgetSnippet('<button data-resto-action="book" class="px-4 py-2 bg-amber-400 text-black font-bold rounded-xl">Book a Table</button>')}
+								class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-purple-300 border border-purple-500/30 font-mono text-[11px] transition"
+							>
+								+ Table Booking Button
+							</button>
+							<button
+								type="button"
+								onclick={() => insertWidgetSnippet('<a href="#menu-section" class="px-4 py-2 bg-white text-black font-bold rounded-xl">Order Online</a>')}
+								class="px-2.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-emerald-300 border border-emerald-500/30 font-mono text-[11px] transition"
+							>
+								+ Order Online Link
+							</button>
+						</div>
+					</div>
+
+					<!-- HTML Codearea -->
+					<div class="space-y-1.5">
+						<label for="cms-html-editor" class="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Custom Landing Page HTML / Tailwind Markup</label>
+						<textarea
+							id="cms-html-editor"
+							bind:value={cmsCustomHtml}
+							rows="12"
+							placeholder="Paste your custom hotel landing HTML here..."
+							class="w-full font-mono text-xs p-4 rounded-2xl bg-zinc-950 border border-zinc-800 text-emerald-400 focus:outline-none focus:border-amber-400 leading-relaxed"
+						></textarea>
+					</div>
+				</div>
+			{/if}
+
+			<!-- Actions & Feedback -->
+			<div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						onclick={saveStorefrontCms}
+						class="px-6 py-3 rounded-2xl bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 text-white dark:text-zinc-900 font-extrabold text-xs transition shadow-md active:scale-95 flex items-center gap-2"
+					>
+						<span>💾</span>
+						<span>Save & Publish Storefront</span>
+					</button>
+
+					<button
+						type="button"
+						onclick={resetToDefaultStorefront}
+						class="px-4 py-3 rounded-2xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 font-bold text-xs transition active:scale-95"
+					>
+						Reset to Default
+					</button>
+				</div>
+
+				<div class="flex items-center gap-3">
+					{#if cmsSaveSuccess}
+						<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold animate-in fade-in">
+							✓ Storefront Updated Live!
+						</span>
+					{/if}
+
+					<a
+						href="/"
+						target="_blank"
+						class="px-4 py-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs border border-zinc-700 transition flex items-center gap-1.5"
+					>
+						<span>👁️ Preview Live Storefront →</span>
+					</a>
+				</div>
 			</div>
 		</div>
 	{/if}

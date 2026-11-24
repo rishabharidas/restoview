@@ -120,6 +120,8 @@ export interface TenantBranding {
 	font_family?: string;
 	logo_url?: string;
 	hero_banner_url?: string;
+	custom_landing_html?: string;
+	landing_mode?: 'DEFAULT' | 'CUSTOM_HTML';
 }
 
 export interface TenantSettings {
